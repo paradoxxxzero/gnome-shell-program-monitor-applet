@@ -1,0 +1,7 @@
+{
+    "shell-version": ["3.0"],
+    "uuid": "program-monitor@paradoxxx.zero.gmail.com",
+    "name": "program-monitor",
+    "url": "https://github.com/paradoxxxzero/gnome-shell-program-monitor-applet",
+    "description": "Display program informations in gnome shell status bar, such as memory usage, cpu usage, network rates…"
+}
