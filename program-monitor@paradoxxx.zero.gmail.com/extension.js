@@ -46,27 +46,28 @@ ProgramMonitor.prototype = {
 
 function main() {
     let panel = Main.panel._leftBox;
-
     let pm = new ProgramMonitor();
     Main.__pm = pm;
     let tracker = Shell.WindowTracker.get_default();
+
     let update = function () {
-        let tracker = Shell.WindowTracker.get_default();
-        let running_apps = tracker.get_running_apps('');
-        if(running_apps.length > 0) {
-            let current_app = running_apps[0];
-            let pidstat = GLib.spawn_command_line_sync('pgrep ' + current_app.get_name().toLowerCase());
-            if(pidstat[0]) {
-                let pid = parseInt(pidstat[1]);
-                let statm = Shell.get_file_contents_utf8_sync('/proc/' + pid + '/statm');
-                let used_mem = parseInt(statm.split(" ")[0]);
-                Main.__pm._label.set_text(used_mem + "k");
-            }
+        let focus_app = tracker.focus_app;
+        if(focus_app) {
+            let pid = focus_app.get_pids();
+            let statm = Shell.get_file_contents_utf8_sync('/proc/' + pid + '/statm');
+            let used_mem = parseInt(statm.split(" ")[1]) * 4096 / 1024; // Hardcoding page_size... Waiting for a good solution
+            pm._label.set_text(" mem: " + used_mem + "k");
+        } else {
+            pm._label.set_text("");
         }
     };
     update();
     tracker.connect('notify::focus-app', update);
     global.window_manager.connect('switch-workspace', update);
-    Mainloop.timeout_add(1000, update);
+    Mainloop.timeout_add(1000, function () {
+                             update();
+                             return true;
+                         }
+                        );
     panel.add(pm.actor);
 }
