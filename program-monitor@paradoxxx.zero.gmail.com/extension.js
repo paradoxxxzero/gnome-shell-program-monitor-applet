@@ -30,35 +30,86 @@ const PanelMenu = imports.ui.panelMenu;
 const Mainloop = imports.mainloop;
 
 
-function ProgramMonitor() {
+function ProgramMemory() {
     this._init.apply(this, arguments);
 }
 
-ProgramMonitor.prototype = {
+ProgramMemory.prototype = {
     __proto__: PanelMenu.SystemStatusButton.prototype,
     _init: function() {
         PanelMenu.SystemStatusButton.prototype._init.call(this, "");
-        this._label = new St.Label({ text: "?" });
-        this.actor.set_child(this._label);
+        this._box = new St.BoxLayout();
+        this._label = new St.Label({ style_class: "sm-status-label", text: "mem:" });
+        this._box.add_actor(this._label);
+        this._value = new St.Label({ style_class: "sm-status-value", text: "?" });
+        this._box.add_actor(this._value);
+        this._unit = new St.Label({ style_class: "sm-unit-label", text: "k" });
+        this._box.add_actor(this._unit);
+        this.actor.set_child(this._box);
+    },
+    update: function (pid) {
+        let statm = Shell.get_file_contents_utf8_sync('/proc/' + pid + '/statm');
+        let used_mem = parseInt(statm.split(" ")[1]) * 4096 / 1024; // Hardcoding page_size... Waiting for a good solution
+        this._value.set_text(used_mem.toString());
+        this._box.show();
+    },
+    _onDestroy: function() {}
+};
+function ProgramCpu() {
+    this._init.apply(this, arguments);
+}
+
+ProgramCpu.prototype = {
+    __proto__: PanelMenu.SystemStatusButton.prototype,
+    _init: function() {
+        PanelMenu.SystemStatusButton.prototype._init.call(this, "");
+        this._box = new St.BoxLayout();
+        this._label = new St.Label({ style_class: "sm-status-label", text: "cpu:" });
+        this._box.add_actor(this._label);
+        this._value = new St.Label({ style_class: "sm-status-value", text: "?" });
+        this._box.add_actor(this._value);
+        this._unit = new St.Label({ style_class: "sm-unit-label", text: "%" });
+        this._box.add_actor(this._unit);
+        this.actor.set_child(this._box);
+        this.last_time = 0;
+    },
+    update: function (pid) {
+        let stat = Shell.get_file_contents_utf8_sync('/proc/' + pid + '/stat');
+
+        let utime_cpu = parseInt(stat.split(" ")[12]);
+        let stime_cpu = parseInt(stat.split(" ")[13]);
+        let cutime_cpu = parseInt(stat.split(" ")[14]);
+        let cstime_cpu = parseInt(stat.split(" ")[15]);
+        let total = utime_cpu + stime_cpu + cutime_cpu + cstime_cpu;
+        let time = GLib.get_monotonic_time() / 10000 / 100;
+        if(this[pid + "total"]) {
+            let cpu_used = (total - this[pid + "total"]) / (time - this.last_time);
+            this._value.set_text(Math.round(cpu_used).toString());
+            this._box.show();
+        }
+        this.last_time = time;
+        this[pid + "total"] = total;
     },
     _onDestroy: function() {}
 };
 
 function main() {
     let panel = Main.panel._leftBox;
-    let pm = new ProgramMonitor();
-    Main.__pm = pm;
+    let mem = new ProgramMemory();
+    let cpu = new ProgramCpu();
+    Main.__program_memory = mem;
+    Main.__program_cpu = cpu;
     let tracker = Shell.WindowTracker.get_default();
 
     let update = function () {
         let focus_app = tracker.focus_app;
         if(focus_app) {
             let pid = focus_app.get_pids();
-            let statm = Shell.get_file_contents_utf8_sync('/proc/' + pid + '/statm');
-            let used_mem = parseInt(statm.split(" ")[1]) * 4096 / 1024; // Hardcoding page_size... Waiting for a good solution
-            pm._label.set_text(" mem: " + used_mem + "k");
+            mem.update(pid);
+            cpu.update(pid);
         } else {
-            pm._label.set_text("");
+            mem._box.hide();
+            cpu._box.hide();
         }
     };
     update();
@@ -69,5 +120,6 @@ function main() {
                              return true;
                          }
                         );
-    panel.add(pm.actor);
+    panel.add(mem.actor);
+    panel.add(cpu.actor);
 }

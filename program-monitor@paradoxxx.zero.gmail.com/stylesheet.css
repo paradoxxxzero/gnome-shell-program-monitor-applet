@@ -1,0 +1,14 @@
+.sm-status-label {
+    color: #bbb;
+    font-size: 10px;
+    padding: 0 2px 0 5px;
+}
+
+.sm-unit-label {
+    color: #aaa;
+    font-size: 8px;
+    padding: 6px 5px 0 2px;
+}
+.sm-status-value {
+    text-align: right;
+}
